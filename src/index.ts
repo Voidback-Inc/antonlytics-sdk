@@ -1,64 +1,40 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// @antonlytics/sdk — Public API
-// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Antonlytics JavaScript/TypeScript SDK - Memory for AI Agents
+ *
+ * Simple SDK for giving your AI agent persistent memory.
+ *
+ * @packageDocumentation
+ */
 
-// Main client
-export { Antonlytics } from "./client.js";
-
-// Errors
-export { AntoError, isAntoError } from "./errors.js";
-
-// Query builder classes (for advanced use)
-export { QueryBuilder, EntityBuilder } from "./query.js";
-
-// Low-level utilities (for custom integrations)
-export { Emitter }              from "./emitter.js";
-export type { EmitFn }          from "./emitter.js";
-export { RateLimiter }          from "./limiter.js";
-export type { HttpConfig }      from "./http.js";
-
-// All TypeScript types
+export { Agent } from './agent';
 export type {
-  AntonlyticsConfig,
-  SdkEvents,
+  AgentConfig,
+  IngestResponse,
+  ChatResponse,
+  MemoryContext,
+  Message
+} from './agent';
+export { AntonlyticsError, APIError, AuthenticationError } from './exceptions';
 
-  // Triplets
-  EntityRef,
-  Triplet,
-  IngestOptions,
-  BatchIngestOptions,
-  IngestResult,
-  IngestionEvent,
-  IngestionStatus,
-  PollOptions,
+/**
+ * Quick agent setup helper function.
+ *
+ * @param apiKey - Your API key
+ * @param projectId - Your project ID
+ * @returns Agent instance
+ *
+ * @example
+ * ```typescript
+ * import { createAgent } from 'antonlytics';
+ *
+ * const agent = createAgent('your-api-key', 'project-id');
+ * await agent.chat("Who should I follow up with?");
+ * ```
+ */
+export function createAgent(apiKey: string, projectId: string) {
+  const { Agent } = require('./agent');
+  return new Agent({ apiKey, projectId });
+}
 
-  // Ontology
-  OntologyTree,
-  EntityTypeDef,
-  PropertyDef,
-  RelationshipDef,
-
-  // Query
-  QueryPayload,
-  QueryResult,
-  EntitySpec,
-  QueryFilter,
-  FilterOperator,
-  OrderBySpec,
-  RelationshipSpec,
-
-  // Dashboard
-  DashboardMetrics,
-  DashboardSummary,
-
-  // Projects
-  Project,
-  CreateProjectOptions,
-  GraphStats,
-
-  // Misc
-  UUID,
-  ISODateString,
-  DateString,
-  AntoErrorDetails,
-} from "./types.js";
+// Default export for convenience
+export { Agent as default } from './agent';

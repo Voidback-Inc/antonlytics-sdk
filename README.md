@@ -1,362 +1,372 @@
-# @antonlytics/sdk
+# Antonlytics JavaScript/TypeScript SDK
 
-Official JavaScript / TypeScript SDK for the [Antonlytics](https://antonlytics.com) Knowledge Graph API.
+Memory for AI Agents - Simple natural language SDK.
 
-[![npm](https://img.shields.io/npm/v/@antonlytics/sdk)](https://www.npmjs.com/package/@antonlytics/sdk)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Node.js ≥18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
+[![npm version](https://badge.fury.io/js/antonlytics.svg)](https://badge.fury.io/js/antonlytics)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
----
-
-## Install
+## Installation
 
 ```bash
-npm install @antonlytics/sdk
+npm install antonlytics
 ```
 
-> **Node 18+** recommended (native `fetch`). For older Node, pass a `fetch` polyfill via `config.fetch`.
+Or with Yarn:
 
----
+```bash
+yarn add antonlytics
+```
 
 ## Quick Start
 
-```ts
-import { Antonlytics } from "@antonlytics/sdk";
+```typescript
+import { Agent } from 'antonlytics';
 
-const anto = new Antonlytics({
-  apiKey: process.env.ANTONLYTICS_API_KEY!, // anto_live_...
+// Initialize agent
+const agent = new Agent({
+  apiKey: 'your-api-key',
+  projectId: 'your-project-id'
 });
 
-// Ingest a relationship
-await anto.ingest.track({
-  projectId: "proj_abc",
-  triplets: {
-    subject:  { type: "Customer", id: "cust_1", properties: { name: "Alice", country: "USA" } },
-    predicate: "PURCHASED",
-    object:   { type: "Product",  id: "prod_5", properties: { title: "Laptop Pro", price: 999 } },
-  },
-});
+// Ingest - agent learns from natural language
+await agent.ingest(`
+  Had a call with Sarah Johnson from TechCorp today.
+  She's interested in our Enterprise plan for 50 users.
+  Follow up next Tuesday.
+`);
 
-// Query the graph
-const { rows } = await anto.query
-  .build("proj_abc")
-  .select("Customer", "c1")
-    .properties("name", "email", "country")
-    .eq("country", "USA")
-    .gte("age", 18)
-  .done()
-  .orderBy("age", "desc")
-  .limit(50)
-  .run();
+// Chat - agent remembers and responds
+const response = await agent.chat("Who should I follow up with?");
+console.log(response.response);
+// => "You should follow up with Sarah Johnson from TechCorp..."
 ```
 
----
+## Features
 
-## Configuration
+- **Natural Language Ingestion** - No complex entity creation, just plain English
+- **AI-Powered Chat** - Chat with your agent using our model + your memory
+- **Memory Access** - Get structured memory for your own AI model
+- **System Prompts** - Configure agent behavior and personality
+- **TypeScript Support** - Full type definitions included
+- **Works Everywhere** - Node.js and modern browsers
 
-```ts
-const anto = new Antonlytics({
-  apiKey:    "anto_live_...",                     // required — from app.antonlytics.com → API Keys
-  baseUrl:   "https://api.antonlytics.com",       // optional, default shown
-  timeout:   30_000,                              // ms, default 30s
-  retries:   2,                                   // auto-retry on 5xx/network errors
-  debug:     false,                               // log requests to console
-  fetch:     customFetch,                         // custom fetch (Node 16, test mocks, edge runtimes)
-  rateLimit: { maxRequests: 100, windowMs: 60_000 }, // optional client-side throttle
-});
+## Two Usage Options
+
+### Option 1: Use Our Model
+
+Full-service AI with your system prompt + memory:
+
+```typescript
+// We handle everything
+const response = await agent.chat("Who should I follow up with?");
+console.log(response.response);
 ```
 
-**API key validation** — keys must start with `anto_live_`. The constructor throws `INVALID_API_KEY` immediately if the format is wrong, so misconfiguration is caught at startup, not at runtime.
+### Option 2: Use Your Model
 
----
+Just get memory context for your own model:
 
-## Ingestion
+```typescript
+// Get memory
+const memory = await agent.getMemory();
 
-All data enters the knowledge graph through the SDK as **triplets**: `(subject) –[predicate]→ (object)`.
+// Use with your model (OpenAI, Anthropic, etc.)
+import OpenAI from 'openai';
+const openai = new OpenAI();
 
-### `anto.ingest.track(options, pollOptions?)` ← recommended
-
-Ingest and automatically poll if the job is async. Handles both sync and async transparently.
-
-```ts
-const result = await anto.ingest.track(
-  {
-    projectId: "proj_abc",
-    triplets: [
-      {
-        subject:   { type: "Customer", id: "cust_1", properties: { name: "Alice", country: "USA" } },
-        predicate: "PURCHASED",
-        object:    { type: "Product",  id: "prod_5", properties: { title: "Laptop Pro", price: 999 } },
-        relationship_properties: { quantity: 2, date: "2026-04-15" },
-      },
-    ],
-  },
-  {
-    interval:  1_000,          // poll every 1s for async batches
-    timeout:   60_000,         // give up after 60s
-    onStatus: (e) => console.log("Status:", e.status),
-  }
-);
-```
-
-Batches **≤ 100** triplets → processed synchronously, returns full results immediately.
-Batches **> 100** → queued for background processing, auto-polled until `done`.
-
-### `anto.ingest.send(options)` — fire and forget
-
-```ts
-const result = await anto.ingest.send({ projectId, triplets });
-if (result.async) {
-  // poll manually
-  const event = await anto.ingest.poll(result.event_id, { onStatus: console.log });
-}
-```
-
-### `anto.ingest.batch(options)` — large datasets
-
-```ts
-await anto.ingest.batch({
-  projectId: "proj_abc",
-  triplets:  thousandsOfTriplets,
-  chunkSize: 200,
-  onChunk: (i, total, result) => console.log(`Chunk ${i}/${total}`),
+const response = await openai.chat.completions.create({
+  model: "gpt-4",
+  messages: [
+    { role: "system", content: "You are a sales assistant" },
+    { role: "system", content: `Memory: ${JSON.stringify(memory)}` },
+    { role: "user", content: "Who to follow up?" }
+  ]
 });
 ```
 
-### `anto.ingest.status(eventId)` / `anto.ingest.history(projectId)`
+## Documentation
 
-```ts
-const event = await anto.ingest.status("event-id");
-const history = await anto.ingest.history("proj_abc");
-```
+### Agent Class
 
----
+#### `constructor(config: AgentConfig)`
 
-## Query Builder
+Initialize the agent.
 
-### Fluent API
+**Parameters:**
+- `config.apiKey` (string): Your Antonlytics API key
+- `config.projectId` (string): Your project/agent ID
+- `config.baseUrl` (string, optional): API base URL
 
-```ts
-const result = await anto.query
-  .build("proj_abc")
-
-  // First entity node
-  .select("Customer", "c1")
-    .properties("name", "email", "country", "age")
-    .eq("country", "USA")
-    .gte("age", 21)
-    .relatesTo("PURCHASED", "p1")   // join to product1 node below
-  .done()
-
-  // Second entity node (joined via PURCHASED relationship)
-  .select("Product", "p1")
-    .properties("title", "price", "category")
-    .lte("price", 500)
-  .done()
-
-  .orderBy("age", "desc")
-  .limit(100)
-  .name("US adult customers buying affordable products")
-  .run();
-
-console.log(result.rows);      // typed rows
-console.log(result.total);     // total result count
-console.log(result.execution_ms);
-```
-
-**Filter operators:** `eq` · `neq` · `contains` · `startsWith` · `endsWith` · `gt` · `gte` · `lt` · `lte`
-
-### Raw payload
-
-```ts
-const result = await anto.query.execute("proj_abc", {
-  entities: [{ alias: "c1", type: "Customer", filters: [{ property: "country", operator: "eq", value: "USA" }] }],
-  limit: 10,
+```typescript
+const agent = new Agent({
+  apiKey: 'your-api-key',
+  projectId: 'your-project-id'
 });
 ```
 
-### Ontology tree
+#### `ingest(text: string): Promise<IngestResponse>`
 
-```ts
-const tree = await anto.query.ontology("proj_abc");
-// {
-//   Customer: {
-//     properties: [{ name: "name", type: "str" }, ...],
-//     relationships: [{ name: "PURCHASED", target: "Product" }]
-//   }
-// }
+Ingest natural language text and extract entities/relationships.
+
+**Parameters:**
+- `text` (string): Natural language text (conversations, notes, emails)
+
+**Returns:**
+- Promise with extracted entities and relationships
+
+**Example:**
+```typescript
+const result = await agent.ingest("Customer Alice bought Laptop Pro for $999");
+console.log(result.created);  // {entities: 2, relationships: 1}
 ```
 
----
+#### `chat(message: string, history?: Message[]): Promise<ChatResponse>`
 
-## Dashboard
+Chat with your agent. Uses system prompt + full memory context.
 
-```ts
-const { summary, charts, top_ontology_queries, recent_events } =
-  await anto.dashboard.metrics("proj_abc");
+**Parameters:**
+- `message` (string): Your question or message
+- `history` (Message[], optional): Conversation history
 
-summary.events_tracked        // number
-summary.active_entities       // number
-summary.total_relationships   // number
-summary.query_usage           // number
+**Returns:**
+- Promise with response and relevant entities
 
-charts.event_volume.data        // [{ date, count }]       — scatter
-charts.entity_distribution.data // [{ name, value }]       — pie
-charts.relationship_growth.data // [{ date, new, cumulative }] — histogram
+**Example:**
+```typescript
+const response = await agent.chat("Who bought laptops?");
+console.log(response.response);
+console.log(response.relevant_entities);
 ```
 
----
+#### `getMemory(query?: string): Promise<MemoryContext>`
 
-## Projects
+Get structured memory for your own AI model.
 
-```ts
-const projects = await anto.projects.list();
-const project  = await anto.projects.get("proj_abc");
-const created  = await anto.projects.create({ name: "My Graph", teamId: "team-uuid" });
-const stats    = await anto.projects.stats("proj_abc");
-const ontology = await anto.projects.ontology("proj_abc");
+**Parameters:**
+- `query` (string, optional): Natural language query to filter memory
+
+**Returns:**
+- Promise with entities and relationships
+
+**Example:**
+```typescript
+const memory = await agent.getMemory("laptop purchases");
+// Use with your own model
 ```
 
----
+#### `setSystemPrompt(prompt: string): Promise<{system_prompt: string}>`
+
+Configure agent behavior and personality.
+
+**Parameters:**
+- `prompt` (string): System prompt text
+
+**Example:**
+```typescript
+await agent.setSystemPrompt(`
+  You are a helpful sales assistant.
+  Be concise and action-oriented.
+  Focus on follow-ups and next steps.
+`);
+```
+
+#### `getSystemPrompt(): Promise<string>`
+
+Get current system prompt.
+
+**Returns:**
+- Promise with system prompt text
 
 ## Error Handling
 
-All methods throw `AntoError` on failure.
-
-```ts
-import { isAntoError } from "@antonlytics/sdk";
+```typescript
+import { Agent, AntonlyticsError, APIError, AuthenticationError } from 'antonlytics';
 
 try {
-  await anto.ingest.track({ ... });
-} catch (err) {
-  if (isAntoError(err)) {
-    console.error(err.code);    // "PLAN_LIMIT_REACHED", "UNAUTHORIZED", "NOT_FOUND" …
-    console.error(err.status);  // 402, 401, 404, 0 (network/timeout) …
-    console.error(err.message); // human-readable
-    console.error(err.details); // raw server payload
-
-    if (err.code === "PLAN_LIMIT_REACHED") {
-      // Redirect user to upgrade: app.antonlytics.com/billing
-    }
-    if (err.code === "UNAUTHORIZED") {
-      // API key is invalid or revoked
-    }
+  const agent = new Agent({ apiKey: 'invalid', projectId: 'test' });
+  await agent.chat("Hello");
+} catch (error) {
+  if (error instanceof AuthenticationError) {
+    console.error('Auth error:', error.message);
+  } else if (error instanceof APIError) {
+    console.error('API error:', error.statusCode, error.message);
+  } else if (error instanceof AntonlyticsError) {
+    console.error('Error:', error.message);
   }
 }
 ```
 
-| Code | HTTP | Meaning |
-|---|---|---|
-| `INVALID_CONFIG`   | 0   | Missing or empty `apiKey` |
-| `INVALID_API_KEY`  | 0   | Key doesn't start with `anto_live_` |
-| `MISSING_FETCH`    | 0   | `fetch` not available in runtime |
-| `UNAUTHORIZED`     | 401 | API key invalid or revoked |
-| `FORBIDDEN`        | 403 | Key lacks permission for this resource |
-| `NOT_FOUND`        | 404 | Project, event, or entity not found |
-| `PLAN_LIMIT_REACHED` | 402 | Event quota exhausted for your plan |
-| `API_KEY_LIMIT_REACHED` | 402 | Too many API keys for your plan |
-| `RATE_LIMITED`     | 429 | Too many requests |
-| `SERVER_ERROR`     | 500 | Backend error |
-| `INGESTION_FAILED` | 500 | Async ingestion job failed |
-| `POLL_TIMEOUT`     | 0   | Async job didn't finish within timeout |
-| `NETWORK_ERROR`    | 0   | Network failure |
-| `TIMEOUT`          | 0   | Request exceeded `config.timeout` |
+## Complete Example
 
----
+```typescript
+import { Agent } from 'antonlytics';
 
-## Lifecycle Events
-
-```ts
-anto.on("request",     ({ method, path, body }) => { /* before every request */ });
-anto.on("response",    ({ method, path, status, ms }) => { /* after success */ });
-anto.on("retry",       ({ method, path, attempt, error }) => { /* on auto-retry */ });
-anto.on("error",       ({ method, path, error }) => { /* after all retries fail */ });
-anto.on("ingest_queued",  ({ event_id, triplets_count }) => { /* job submitted */ });
-anto.on("ingest_done",    ({ event_id, triplets_count, results }) => { /* job done */ });
-anto.on("ingest_failed",  ({ event_id, error }) => { /* job failed */ });
-anto.on("query_executed", ({ project_id, entity_types, result_count, execution_ms }) => { });
-anto.on("plan_limit_hit", ({ used, limit }) => { /* redirect to /billing */ });
-
-// Unsubscribe
-const unsub = anto.on("error", handler);
-unsub(); // remove this listener
-
-// Subscribe once
-anto.once("ingest_done", handler);
-```
-
----
-
-## CLI
-
-```bash
-# Install globally
-npm install -g @antonlytics/sdk
-
-# Or use npx
-ANTO_API_KEY=anto_live_xxx npx @antonlytics/sdk projects
-
-# Commands
-anto projects
-anto stats      <project-id>
-anto ontology   <project-id>
-anto ingest     <project-id> ./triplets.json
-anto query      <project-id> ./query.json
-anto dashboard  <project-id>
-anto poll       <event-id>
-
-# Environment
-ANTO_API_KEY=anto_live_xxx   # required
-ANTO_BASE_URL=http://...     # optional, self-hosted
-ANTO_DEBUG=1                 # log raw HTTP
-ANTO_VERBOSE=1               # log lifecycle events
-```
-
----
-
-## Next.js Integration
-
-```ts
-// lib/anto.ts — server-side singleton
-import { Antonlytics } from "@antonlytics/sdk";
-
-export const anto = new Antonlytics({
-  apiKey: process.env.ANTONLYTICS_API_KEY!,
+// Initialize
+const agent = new Agent({
+  apiKey: 'your-api-key',
+  projectId: 'your-project-id'
 });
 
-// app/api/ingest/route.ts
-import { anto } from "@/lib/anto";
-import { NextRequest, NextResponse } from "next/server";
-import { isAntoError } from "@antonlytics/sdk";
+// Set behavior
+await agent.setSystemPrompt(`
+  You are a sales assistant.
+  Focus on follow-ups and next steps.
+`);
 
-export async function POST(req: NextRequest) {
-  try {
-    const { projectId, triplets } = await req.json();
-    const result = await anto.ingest.track({ projectId, triplets });
-    return NextResponse.json(result);
-  } catch (err) {
-    if (isAntoError(err)) {
-      return NextResponse.json({ error: err.message, code: err.code }, { status: err.status || 500 });
-    }
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
-  }
+// Ingest multiple conversations
+await agent.ingest(`
+  Call with Mike Rodriguez from StartupXYZ.
+  He's the founder. Looking at our API for their mobile app.
+  Has 100K users. Wants custom pricing.
+  Send proposal by Friday.
+`);
+
+await agent.ingest(`
+  Email from Sarah Chen at BigCorp.
+  VP of Engineering. Interested in Enterprise.
+  Team of 200 developers. Budget discussion next week.
+`);
+
+// Query memory
+const response = await agent.chat("What are my top priorities this week?");
+console.log(response.response);
+
+// Get all contacts
+const contacts = await agent.chat("List all people I've talked to");
+contacts.relevant_entities
+  .filter(e => e.type === "Person")
+  .forEach(e => console.log(`- ${e.name}`));
+```
+
+## TypeScript Types
+
+Full TypeScript support with type definitions:
+
+```typescript
+import type {
+  AgentConfig,
+  IngestResponse,
+  ChatResponse,
+  MemoryContext,
+  Message
+} from 'antonlytics';
+```
+
+## Node.js vs Browser
+
+### Node.js (CommonJS)
+
+```javascript
+const { Agent } = require('antonlytics');
+
+const agent = new Agent({
+  apiKey: process.env.ANTONLYTICS_API_KEY,
+  projectId: process.env.ANTONLYTICS_PROJECT_ID
+});
+```
+
+### Node.js (ESM)
+
+```javascript
+import { Agent } from 'antonlytics';
+
+const agent = new Agent({
+  apiKey: process.env.ANTONLYTICS_API_KEY,
+  projectId: process.env.ANTONLYTICS_PROJECT_ID
+});
+```
+
+### Browser
+
+```html
+<script type="module">
+  import { Agent } from 'https://unpkg.com/antonlytics@2.0.0/dist/index.mjs';
+
+  const agent = new Agent({
+    apiKey: 'your-api-key',
+    projectId: 'your-project-id'
+  });
+
+  // Use agent
+  const response = await agent.chat("Hello");
+  console.log(response);
+</script>
+```
+
+## React Example
+
+```tsx
+import { Agent } from 'antonlytics';
+import { useState, useEffect } from 'react';
+
+function ChatWithAgent() {
+  const [agent] = useState(() => new Agent({
+    apiKey: process.env.REACT_APP_ANTONLYTICS_API_KEY!,
+    projectId: process.env.REACT_APP_ANTONLYTICS_PROJECT_ID!
+  }));
+  
+  const [message, setMessage] = useState('');
+  const [response, setResponse] = useState('');
+
+  const handleChat = async () => {
+    const result = await agent.chat(message);
+    setResponse(result.response);
+  };
+
+  return (
+    <div>
+      <input
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        placeholder="Ask your agent..."
+      />
+      <button onClick={handleChat}>Send</button>
+      {response && <div>{response}</div>}
+    </div>
+  );
 }
 ```
 
----
+## Requirements
+
+- Node.js >= 14.0.0 (for Node.js usage)
+- Modern browser with ES2020 support (for browser usage)
 
 ## Development
 
 ```bash
+# Clone repository
+git clone https://github.com/Voidback-Inc/antonlytics-js-sdk
+cd antonlytics-js-sdk
+
+# Install dependencies
 npm install
-npm run build       # CJS + ESM + TypeScript declarations
-npm test            # Vitest
-npm run test:watch
-npm run lint        # tsc --noEmit
+
+# Build
+npm run build
+
+# Run tests
+npm test
+
+# Watch mode
+npm run dev
 ```
 
----
+## Links
+
+- [Documentation](https://antonlytics.com/docs/javascript-sdk)
+- [API Reference](https://antonlytics.com/docs/api)
+- [GitHub](https://github.com/Voidback-Inc/antonlytics-js-sdk)
+- [npm](https://www.npmjs.com/package/antonlytics)
+- [Website](https://antonlytics.com)
 
 ## License
 
-MIT © Antonlytics
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Support
+
+- Email: support@antonlytics.com
+- Documentation: https://antonlytics.com/docs
+- Issues: https://github.com/Voidback-Inc/antonlytics-js-sdk/issues

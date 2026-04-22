@@ -1,10 +1,10 @@
 {
-  "name": "@antonlytics/sdk",
-  "version": "1.0.0",
-  "description": "Official JavaScript / TypeScript SDK for the Antonlytics Knowledge Graph API",
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "name": "antonlytics",
+  "version": "2.0.0",
+  "description": "Memory for AI Agents - Simple natural language SDK",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -12,57 +12,52 @@
       "require": "./dist/index.js"
     }
   },
-  "bin": {
-    "anto": "./dist/cli.js"
-  },
   "files": [
     "dist",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsup src/index.ts src/cli.ts --format cjs,esm --dts --clean --splitting false",
-    "build:watch": "tsup src/index.ts --format cjs,esm --dts --watch",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "lint": "tsc --noEmit",
-    "prepublishOnly": "npm run build && npm test"
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
-    "antonlytics",
+    "ai",
+    "agent",
+    "memory",
+    "llm",
     "knowledge-graph",
-    "ontology",
-    "sdk",
-    "triplet",
-    "graph"
+    "natural-language",
+    "typescript"
   ],
-  "author": "Antonlytics <sdk@antonlytics.com>",
+  "author": "Voidback <hello@voidback.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/antonlytics/sdk-js"
+    "url": "https://github.com/Voidback-Inc/antonlytics-js-sdk.git"
   },
-  "homepage": "https://docs.antonlytics.com/sdk/javascript",
   "bugs": {
-    "url": "https://github.com/antonlytics/sdk-js/issues"
+    "url": "https://github.com/Voidback-Inc/antonlytics-js-sdk/issues"
   },
+  "homepage": "https://antonlytics.com",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=14.0.0"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",
-    "@vitest/coverage-v8": "^4.1.4",
-    "tsup": "^8.1.0",
-    "typescript": "^5.4.5",
-    "vitest": "^4.1.4"
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.5.0",
+    "prettier": "^3.0.0",
+    "ts-jest": "^29.1.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
   },
-  "peerDependencies": {
-    "typescript": ">=4.7.0"
-  },
-  "peerDependenciesMeta": {
-    "typescript": {
-      "optional": true
-    }
-  }
+  "dependencies": {}
 }
