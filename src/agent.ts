@@ -56,6 +56,13 @@ export interface MemoryContext {
   }>;
 }
 
+export interface MemoryListPage {
+  entities: MemoryContext['entities'];
+  relationships: MemoryContext['relationships'];
+  next_cursor: string | null;
+  has_more: boolean;
+}
+
 export interface Message {
   role: string;
   content: string;
@@ -175,31 +182,92 @@ export class Agent {
 
   /**
    * Get memory context for your own agent/model.
-   * Returns structured knowledge graph data.
    *
-   * @param query - Optional natural language query to filter context
-   * @returns Entities and relationships
+   * Two modes:
+   * - With `query`: semantic top-K retrieval (single shot, server-ranked).
+   *   Returns the most relevant entities and their relationships.
+   * - Without `query`: enumerates the full project graph via cursor pagination,
+   *   auto-iterating pages internally. Stops at `maxEntities` for safety.
+   *
+   * @param query - Optional natural language query for ranked retrieval.
+   * @param options.maxEntities - Safety ceiling for full-graph mode (default 10000).
+   * @param options.pageSize - Pagination page size for full-graph mode (1-1000, default 500).
+   * @returns Entities and relationships.
    *
    * @example
    * ```typescript
-   * // Get all memory
-   * const memory = await agent.getMemory();
+   * // Top-K retrieval for prompt context
+   * const memory = await agent.getMemory("What did Sarah say?");
    *
-   * // Use with your own model
-   * const response = await yourModel.chat({
-   *   system: "You are a sales assistant",
-   *   context: memory,
-   *   message: "Who to follow up?"
-   * });
+   * // Full project dump (auto-paginated)
+   * const all = await agent.getMemory();
+   *
+   * // For very large projects, stream pages:
+   * for await (const page of agent.iterMemory({ pageSize: 500 })) {
+   *   process(page);
+   * }
    * ```
    */
-  async getMemory(query?: string): Promise<MemoryContext> {
-    const response = await this.client.post<{ graph_context: MemoryContext }>('/api/v1/memory/query/', {
-      question: query || 'What do you know?',
-      project_id: this.projectId
-    });
+  async getMemory(
+    query?: string,
+    options: { maxEntities?: number; pageSize?: number } = {}
+  ): Promise<MemoryContext> {
+    if (query) {
+      const response = await this.client.post<{ graph_context: MemoryContext }>(
+        '/api/v1/memory/query/',
+        { question: query, project_id: this.projectId }
+      );
+      return response.graph_context || { entities: [], relationships: [] };
+    }
 
-    return response.graph_context || { entities: [], relationships: [] };
+    const maxEntities = options.maxEntities ?? 10_000;
+    const pageSize    = options.pageSize ?? 500;
+
+    const entities: MemoryContext['entities'] = [];
+    const relationships: MemoryContext['relationships'] = [];
+    for await (const page of this.iterMemory({ pageSize })) {
+      entities.push(...(page.entities || []));
+      relationships.push(...(page.relationships || []));
+      if (entities.length >= maxEntities) {
+        entities.length = maxEntities;
+        break;
+      }
+    }
+    return { entities, relationships };
+  }
+
+  /**
+   * Stream the full project graph one page at a time.
+   *
+   * Yields a page object `{ entities, relationships, next_cursor, has_more }`
+   * per iteration. Iteration stops automatically when the server reports no
+   * more pages.
+   *
+   * @param options.pageSize - Rows per page (1-1000, default 500).
+   *
+   * @example
+   * ```typescript
+   * for await (const page of agent.iterMemory({ pageSize: 200 })) {
+   *   for (const e of page.entities) console.log(e.name);
+   * }
+   * ```
+   */
+  async *iterMemory(
+    options: { pageSize?: number } = {}
+  ): AsyncIterableIterator<MemoryListPage> {
+    const pageSize = options.pageSize ?? 500;
+    let cursor: string | null = null;
+    while (true) {
+      const payload: Record<string, unknown> = {
+        project_id: this.projectId,
+        limit: pageSize,
+      };
+      if (cursor) payload.cursor = cursor;
+      const page = await this.client.post<MemoryListPage>('/api/v1/memory/list/', payload);
+      yield page;
+      if (!page.has_more || !page.next_cursor) break;
+      cursor = page.next_cursor;
+    }
   }
 
   /**

@@ -12,6 +12,7 @@ export type {
   IngestResponse,
   ChatResponse,
   MemoryContext,
+  MemoryListPage,
   Message
 } from './agent';
 export { AntonlyticsError, APIError, AuthenticationError } from './exceptions';
