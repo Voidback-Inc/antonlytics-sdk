@@ -15,6 +15,8 @@ export type {
   MemoryListPage,
   Message
 } from './agent';
+export { Antonlytics } from './client';
+export type { AntonlyticsConfig, Project } from './client';
 export { AntonlyticsError, APIError, AuthenticationError } from './exceptions';
 
 /**

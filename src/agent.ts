@@ -144,6 +144,68 @@ export class Agent {
   }
 
   /**
+   * Ingest pre-formed triplets directly — bypasses Claude extraction.
+   *
+   * Use this from SaaS applications when your code already knows the
+   * structured data (DB rows, parsed events, etc.) and you don't want to
+   * pay LLM extraction cost / latency.
+   *
+   * Each triplet is `{subject, predicate, object, relationship_properties?}`.
+   * Batches over 100 are processed asynchronously; poll
+   * `agent.ingestionEventStatus(eventId)` if `async: true`.
+   *
+   * @example
+   * ```typescript
+   * await agent.ingestTriplets([
+   *   {
+   *     subject:   { type: "Customer", id: "cust_42", properties: { name: "Acme" }},
+   *     predicate: "PURCHASED",
+   *     object:    { type: "Product",  id: "prod_7",  properties: { sku: "P-7" }},
+   *   },
+   * ]);
+   * ```
+   */
+  async ingestTriplets(triplets: Array<Record<string, any>>): Promise<{
+    success: boolean; event_id: string; async: boolean; results?: any; message?: string;
+  }> {
+    if (!triplets?.length) throw new AntonlyticsError('triplets must be a non-empty array');
+    return this.client.post('/api/v1/ingest/', {
+      project_id: this.projectId,
+      triplets,
+    });
+  }
+
+  /** Convenience: upsert a single entity (no relationship). */
+  async upsertEntity(type: string, externalId: string,
+                     properties: Record<string, any> = {}): Promise<any> {
+    return this.ingestTriplets([{
+      subject:   { type, id: externalId, properties },
+      predicate: 'SELF',
+      object:    { type, id: externalId, properties },
+    }]);
+  }
+
+  /** Convenience: post a single source --[predicate]--> target edge. */
+  async addRelationship(
+    source: { type: string; id: string; properties?: Record<string, any> },
+    predicate: string,
+    target: { type: string; id: string; properties?: Record<string, any> },
+    relationshipProperties: Record<string, any> = {},
+  ): Promise<any> {
+    return this.ingestTriplets([{
+      subject:   source,
+      predicate,
+      object:    target,
+      relationship_properties: relationshipProperties,
+    }]);
+  }
+
+  /** Poll an async ingestion event's status (returned from large batches). */
+  async ingestionEventStatus(eventId: string): Promise<any> {
+    return this.client.get(`/api/v1/ingest/events/${eventId}/`);
+  }
+
+  /**
    * Chat with your agent. Agent has full memory context.
    * Uses your system prompt + memory from knowledge graph.
    *
